@@ -1,5 +1,4 @@
-time,longitude,latitude,stationID,significant_wave_height,mean_wave_period,mean_wave_direction,wave_power_per_unit_crest_length,peak_period,energy_period
-UTC,degrees_east,degrees_north,,m,s,degrees,kW/m,s,s
+time,longitude,latitude,station_id,significant_wave_height,mean_wave_period,mean_wave_direction,wave_power,peak_period,energy_period
 2017-11-25T00:00:00Z,-10.14618,54.23086,Belmullet_Inner,3.79852,7.0341,301.899,76.8657438679395,12.9631,10.3439
 2017-11-25T00:30:00Z,-10.14618,54.23086,Belmullet_Inner,3.8261,7.0528,301.992,78.12442059576415,12.976,10.3614
 2017-11-25T01:00:00Z,-10.14618,54.23086,Belmullet_Inner,3.85141,7.0781,302.033,79.36681752543132,12.9902,10.3878
