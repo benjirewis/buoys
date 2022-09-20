@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 csv = "1.1.6"
 serde = "1.0.144"
+env = "0.0.0"
 
 [dependencies.mongodb]
 version = "2.3.0"
