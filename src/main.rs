@@ -1,27 +1,54 @@
-use chrono::{DateTime, Utc};
 use mongodb::{
-    bson,
     bson::doc,
+    bson::DateTime,
     options::{CreateCollectionOptions, TimeseriesGranularity, TimeseriesOptions},
     sync::Client,
 };
-use serde::{Deserialize, Serialize};
-use std::env;
-use std::error::Error;
+use serde::{de, Deserialize, Serialize};
+use std::{env, error::Error, fmt};
 
+// BuoyDatum represents a single, reported buoy measurement.
 #[derive(Deserialize, Serialize)]
 struct BuoyDatum {
-    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
-    time: DateTime<Utc>, // UTC
-    longitude: f32,               // Degrees east
-    latitude: f32,                // Degrees north
-    station_id: String,           // String
-    significant_wave_height: f32, // Meters
-    mean_wave_period: f32,        // Seconds
-    mean_wave_direction: f32,     // Degrees
-    wave_power: f32,              // Kilowatts / Meter
-    peak_period: f32,             // Seconds
-    energy_period: f32,           // Seconds
+    #[serde(deserialize_with = "deserialize_datetime")]
+    time: bson::DateTime,
+    longitude: f32,
+    latitude: f32,
+    station_id: String,
+    significant_wave_height: f32,
+    mean_wave_period: f32,
+    mean_wave_direction: f32,
+    wave_power: f32,
+    peak_period: f32,
+    energy_period: f32,
+}
+
+// TODO: move date deserializing logic to another file.
+struct DateTimeFromRFC3339Visitor;
+
+fn deserialize_datetime<'de, D>(d: D) -> Result<DateTime, D::Error>
+where
+    D: de::Deserializer<'de>,
+{
+    d.deserialize_str(DateTimeFromRFC3339Visitor)
+}
+
+impl<'de> de::Visitor<'de> for DateTimeFromRFC3339Visitor {
+    type Value = DateTime;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        write!(formatter, "a BSON datetime string")
+    }
+
+    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        match DateTime::parse_rfc3339_str(value) {
+            Ok(dt) => Ok(dt),
+            Err(e) => Err(E::custom(format!("Parse error {} for {}", e, value))),
+        }
+    }
 }
 
 // BuoyCollection is a time-series collection with buoy data.
@@ -117,12 +144,18 @@ impl BuoyCollection {
 
 fn main() -> Result<(), Box<dyn Error>> {
     // Create new buoy collection.
-    let buoy_coll = BuoyCollection::new(true)?;
+    let buoy_coll = BuoyCollection::new(env::var("DEBUG").is_ok())?;
 
     // Populate the collection with data from 2017-short.csv.
     buoy_coll.load_csv("data/2017-short.csv")?;
 
     // List the buoys available for query.
+    buoy_coll.list_buoys()?;
+
+    // Delete the 'Belmullet_Inner' buoy data.
+    buoy_coll.delete_buoy("Belmullet_Inner")?;
+
+    // List the buoys available for query again.
     buoy_coll.list_buoys()?;
     Ok(())
 }
