@@ -140,6 +140,15 @@ impl BuoyCollection {
         println!("{:?}", buoys);
         Ok(())
     }
+
+    // draw_buoy will visualize the statistics of a buoy with textplots-rs.
+    fn draw_buoy(&self, buoy: &str) -> Result<(), Box<dyn Error>> {
+        let cur = self.coll.find(doc! { "station_id": buoy }, None)?;
+        for buoy_datum in cur {
+            println!("wave_height: {}", buoy_datum?.significant_wave_height);
+        }
+        Ok(())
+    }
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -152,10 +161,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // List the buoys available for query.
     buoy_coll.list_buoys()?;
 
-    // Delete the 'Belmullet_Inner' buoy data.
-    buoy_coll.delete_buoy("Belmullet_Inner")?;
-
-    // List the buoys available for query again.
-    buoy_coll.list_buoys()?;
+    // Draw the 'Belmullet_Inner' buoy.
+    buoy_coll.draw_buoy("Belmullet_Inner")?;
     Ok(())
 }
