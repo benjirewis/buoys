@@ -1,16 +1,14 @@
 use mongodb::{
     bson::doc,
-    bson::DateTime,
     options::{CreateCollectionOptions, TimeseriesGranularity, TimeseriesOptions},
     sync::Client,
 };
-use serde::{de, Deserialize, Serialize};
-use std::{env, error::Error, fmt};
+use serde::{Deserialize, Serialize};
+use std::{env, error::Error};
 
 // BuoyDatum represents a single, reported buoy measurement.
 #[derive(Deserialize, Serialize)]
 struct BuoyDatum {
-    #[serde(deserialize_with = "deserialize_datetime")]
     time: bson::DateTime,
     longitude: f32,
     latitude: f32,
@@ -21,34 +19,6 @@ struct BuoyDatum {
     wave_power: f32,
     peak_period: f32,
     energy_period: f32,
-}
-
-// TODO: move date deserializing logic to another file.
-struct DateTimeFromRFC3339Visitor;
-
-fn deserialize_datetime<'de, D>(d: D) -> Result<DateTime, D::Error>
-where
-    D: de::Deserializer<'de>,
-{
-    d.deserialize_str(DateTimeFromRFC3339Visitor)
-}
-
-impl<'de> de::Visitor<'de> for DateTimeFromRFC3339Visitor {
-    type Value = DateTime;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        write!(formatter, "a BSON datetime string")
-    }
-
-    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
-    where
-        E: de::Error,
-    {
-        match DateTime::parse_rfc3339_str(value) {
-            Ok(dt) => Ok(dt),
-            Err(e) => Err(E::custom(format!("Parse error {} for {}", e, value))),
-        }
-    }
 }
 
 // BuoyCollection is a time-series collection with buoy data.
@@ -110,11 +80,35 @@ impl BuoyCollection {
             println!("loading from {} into buoy collection...", fp);
         }
         let mut rdr = csv::Reader::from_path(fp)?;
-        for result in rdr.deserialize() {
-            // Notice that we need to provide a type hint for automatic
-            // deserialization.
-            let buoy_datum: BuoyDatum = result?;
-            self.coll.insert_one(buoy_datum, None)?;
+        for result in rdr.records() {
+            let record = result?;
+
+            let time_str = record.get(0).unwrap_or_default();
+            let longitude_str = record.get(1).unwrap_or_default();
+            let latitude_str = record.get(2).unwrap_or_default();
+            let station_id_str = record.get(3).unwrap_or_default();
+            let swh_str = record.get(4).unwrap_or_default();
+            let mwp_str = record.get(5).unwrap_or_default();
+            let mwd_str = record.get(6).unwrap_or_default();
+            let wave_power_str = record.get(7).unwrap_or_default();
+            let peak_period_str = record.get(8).unwrap_or_default();
+            let energy_period_str = record.get(9).unwrap_or_default();
+
+            self.coll.insert_one(
+                BuoyDatum {
+                    time: bson::DateTime::parse_rfc3339_str(time_str)?,
+                    longitude: longitude_str.parse::<f32>().unwrap(),
+                    latitude: latitude_str.parse::<f32>().unwrap(),
+                    station_id: station_id_str.to_string(),
+                    significant_wave_height: swh_str.parse::<f32>().unwrap(),
+                    mean_wave_period: mwp_str.parse::<f32>().unwrap(),
+                    mean_wave_direction: mwd_str.parse::<f32>().unwrap(),
+                    wave_power: wave_power_str.parse::<f32>().unwrap(),
+                    peak_period: peak_period_str.parse::<f32>().unwrap(),
+                    energy_period: energy_period_str.parse::<f32>().unwrap(),
+                },
+                None,
+            )?;
         }
         if self.dbg {
             println!("finished loading");
