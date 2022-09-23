@@ -1,10 +1,12 @@
 use mongodb::{
     bson::doc,
-    options::{CreateCollectionOptions, TimeseriesGranularity, TimeseriesOptions},
+    options::{CreateCollectionOptions, FindOptions, TimeseriesGranularity, TimeseriesOptions},
     sync::Client,
 };
+use rgb::RGB8;
 use serde::{Deserialize, Serialize};
 use std::{env, error::Error};
+use textplots::{Chart, ColorPlot, Shape};
 
 // BuoyDatum represents a single, reported buoy measurement.
 #[derive(Deserialize, Serialize)]
@@ -23,7 +25,10 @@ struct BuoyDatum {
 
 // BuoyCollection is a time-series collection with buoy data.
 struct BuoyCollection {
+    // dbg turns on extra logging through stdout.
     dbg: bool,
+
+    // coll is the underlying time-series collection.
     coll: mongodb::sync::Collection<BuoyDatum>,
 }
 
@@ -79,10 +84,12 @@ impl BuoyCollection {
         if self.dbg {
             println!("loading from {} into buoy collection...", fp);
         }
+
         let mut rdr = csv::Reader::from_path(fp)?;
         for result in rdr.records() {
             let record = result?;
 
+            // Pray that the CSV is well-formed...
             let time_str = record.get(0).unwrap_or_default();
             let longitude_str = record.get(1).unwrap_or_default();
             let latitude_str = record.get(2).unwrap_or_default();
@@ -113,6 +120,7 @@ impl BuoyCollection {
         if self.dbg {
             println!("finished loading");
         }
+
         Ok(())
     }
 
@@ -137,10 +145,24 @@ impl BuoyCollection {
 
     // draw_buoy will visualize the statistics of a buoy with textplots-rs.
     fn draw_buoy(&self, buoy: &str) -> Result<(), Box<dyn Error>> {
-        let cur = self.coll.find(doc! { "station_id": buoy }, None)?;
+        let cur = self.coll.find(
+            doc! { "station_id": buoy },
+            FindOptions::builder().sort(doc! { "time": 1 }).build(),
+        )?;
+
+        let mut swh = Vec::new();
+        let mut i = -100.0;
         for buoy_datum in cur {
-            println!("wave_height: {}", buoy_datum?.significant_wave_height);
+            let buoy_datum = buoy_datum?;
+            swh.push((i, buoy_datum.significant_wave_height));
+            i += 1.0;
         }
+
+        let mut chart = Chart::new(120, 60, -100.0, 100.0);
+        chart
+            .linecolorplot(&Shape::Lines(&swh), RGB8 { r: 255, g: 0, b: 0 })
+            .display();
+
         Ok(())
     }
 }

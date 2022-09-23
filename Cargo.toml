@@ -9,3 +9,5 @@ serde = "1.0.144"
 env = "0.0.0"
 bson = { version = "2", features = ["chrono-0_4"] }
 mongodb = { version = "2.3.0", features = ["tokio-sync"] }
+textplots = "0.8.0"
+rgb = "0.8.34"
